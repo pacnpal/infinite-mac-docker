@@ -1,0 +1,16 @@
+services:
+  infinite-mac:
+    image: ghcr.io/pacnpal/infinite-mac-docker:latest
+    # To build from this checkout instead:
+    # build:
+    #   context: ..
+    #   dockerfile: docker/Dockerfile
+    container_name: infinite-mac
+    restart: unless-stopped
+    ports:
+      - "3127:3127"
+    environment:
+      PUID: "99"
+      PGID: "100"
+    volumes:
+      - ./data:/data

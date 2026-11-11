@@ -48,7 +48,7 @@ async function handleRequest(
         return library.handleRequest(request, env.ASSETS);
     }
     if (path[0] === "Disk") {
-        return disk.handleRequest(request, env.DISK_BUCKET, ctx);
+        return disk.handleRequest(request, env.DISK_BUCKET, ctx, env.ASSETS);
     }
 
     const legacyDomainRedirect = getLegacyDomainRedirect(url);
