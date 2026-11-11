@@ -42,6 +42,7 @@ const IMMUTABLE = `public, max-age=${60 * 60 * 24 * 30}, immutable`;
 
 let wrangler = null;
 let wranglerReady = false;
+let wranglerRestartTimer = null;
 let activeBuild = null;
 let importProcess = null;
 let importState = {phase: "starting", startedAt: new Date().toISOString()};
@@ -73,7 +74,25 @@ function main() {
 }
 
 function handleRequest(req, res) {
-    const url = new URL(req.url, "http://localhost");
+    try {
+        routeRequest(req, res);
+    } catch (err) {
+        log(`error handling ${req.method} ${req.url}: ${err.message}`);
+        if (!res.headersSent) {
+            res.writeHead(500, {"Content-Type": "text/plain"});
+        }
+        res.end("Internal error");
+    }
+}
+
+function routeRequest(req, res) {
+    let url;
+    try {
+        url = new URL(req.url ?? "/", "http://localhost");
+    } catch {
+        res.writeHead(400, {"Content-Type": "text/plain"}).end("Bad request");
+        return;
+    }
     const [, first, ...rest] = url.pathname.split("/");
 
     if (first === "Disk" && rest.length === 1 && CHUNK_RE.test(rest[0])) {
@@ -228,6 +247,8 @@ function serveStatus(res, asJson) {
 // --- wrangler ---------------------------------------------------------------
 
 function startWrangler(buildDir) {
+    clearTimeout(wranglerRestartTimer);
+    wranglerRestartTimer = null;
     activeBuild = buildDir;
     wranglerReady = false;
     const config = path.join(buildDir, "infinite_mac", "wrangler.json");
@@ -272,11 +293,19 @@ function startWrangler(buildDir) {
         }
         wranglerReady = false;
         log(`wrangler exited (${signal ?? code}), restarting in 2s`);
-        setTimeout(() => startWrangler(activeBuild), 2000);
+        wranglerRestartTimer = setTimeout(() => {
+            wranglerRestartTimer = null;
+            // Skip if something else started or stopped wrangler meanwhile.
+            if (wrangler === child) {
+                startWrangler(activeBuild);
+            }
+        }, 2000);
     });
 }
 
 function stopWrangler() {
+    clearTimeout(wranglerRestartTimer);
+    wranglerRestartTimer = null;
     const child = wrangler;
     wrangler = null;
     wranglerReady = false;
@@ -309,6 +338,8 @@ function runImport() {
             const phase = /^==> (.*)$/.exec(line);
             if (phase && phase[1] === "Build ready") {
                 switchToFullBuild();
+            } else if (phase?.[1].startsWith("CD-ROMs imported")) {
+                setImportState({cdroms: phase[1]});
             } else if (phase) {
                 setImportState({detail: phase[1]});
             }

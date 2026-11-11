@@ -36,7 +36,7 @@ RUN npm run import-disks minimal \
 # The runtime keeps the source and toolchain so it can import into /data.
 FROM ${RUNTIME_IMAGE}
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends python3 rsync git ca-certificates \
+    && apt-get install -y --no-install-recommends python3 rsync git unar ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=uv-target /uv /usr/local/bin/uv
 ENV UV_PROJECT_ENVIRONMENT=/app/venv \

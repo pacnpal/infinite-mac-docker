@@ -414,7 +414,9 @@ if __name__ == "__main__":
     if minimal_mode:
         system_filter = "System"  # Just classic images
 
-    if not library_filter and not system_filter:
+    # Chunks are content-addressed, so systems mode keeps existing ones (they
+    # may be in use by a running server); the caller cleans up stale ones.
+    if not library_filter and not system_filter and not systems_mode:
         shutil.rmtree(paths.DISK_DIR, ignore_errors=True)
     if not os.path.exists(paths.DISK_DIR):
         os.mkdir(paths.DISK_DIR)

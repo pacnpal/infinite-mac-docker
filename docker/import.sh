@@ -31,6 +31,7 @@ build_key="$(cat "$SRC/.source-hash") $disks_key $cdroms_key"
 main() {
     mkdir -p "$WORK"
     if [ "$(read_state built-from)" = "$build_key" ]; then
+        delete_downloads_if_asked
         echo "==> Up to date"
         exit 0
     fi
@@ -58,11 +59,16 @@ main() {
         build_app
     fi
 
+    python3 "$SRC/docker/gc.py" "$REPO" "$WORK/build" "$WORK/build.old"
+    delete_downloads_if_asked
+    echo "==> Done"
+}
+
+delete_downloads_if_asked() {
     if [ "$KEEP_DOWNLOADS" = "false" ] && [ -d "$CACHE" ]; then
         echo "==> Deleting the download cache"
         rm -rf "$CACHE"
     fi
-    echo "==> Done"
 }
 
 sync_source() {
@@ -72,6 +78,7 @@ sync_source() {
     rsync -a --delete \
         --exclude /node_modules --exclude /Images --exclude /Library \
         --exclude /build --exclude /.wrangler --exclude /.venv \
+        --exclude /XADMaster-build \
         --exclude /CD-ROMs/build --exclude /public/Covers \
         --exclude '/src/Data/*.dsk.json' --exclude /src/Data/CD-ROMs.json \
         --exclude '/src/Data/Library-*.json' \
@@ -85,6 +92,11 @@ sync_source() {
         [ "$name" = build ] || ln -sfn "$f" "$REPO/Images/$name"
     done
     find "$REPO/Images" -maxdepth 1 -type l ! -exec test -e {} \; -delete
+    # Upstream builds lsar/unar from its XADMaster fork with Xcode; Debian's
+    # unar package is the same tool for Linux.
+    mkdir -p "$REPO/XADMaster-build/Release"
+    ln -sfn /usr/bin/lsar "$REPO/XADMaster-build/Release/lsar"
+    ln -sfn /usr/bin/unar "$REPO/XADMaster-build/Release/unar"
 }
 
 import_disks() {
@@ -113,7 +125,16 @@ import_cdroms() {
         uv run scripts/import-cd-roms.py placeholder
     else
         echo "==> Importing CD-ROMs (about 35 GB of downloads for the self-hosted ones)"
-        uv run scripts/import-cd-roms.py
+        # The importer skips entries it can't fetch or extract and carries on;
+        # count those so they're visible on the status page.
+        {
+            rc=0
+            uv run scripts/import-cd-roms.py --keep-media 2>&1 || rc=$?
+            echo "$rc" > "$WORK/cdroms.rc"
+        } | tee "$WORK/cdroms.log"
+        [ "$(cat "$WORK/cdroms.rc")" = 0 ] || return 1
+        skipped="$(grep -c "ERROR, will be skipped" "$WORK/cdroms.log" || true)"
+        echo "==> CD-ROMs imported, $skipped skipped (see cdroms.log in /data/work)"
     fi
 }
 
@@ -121,12 +142,13 @@ build_app() {
     echo "==> Building the app"
     rm -rf "$REPO/build"
     npx vp build
+    # The running wrangler serves $WORK/build until server.mjs switches, so the
+    # previous build is only removed on the next swap.
     rm -rf "$WORK/build.old"
     if [ -d "$WORK/build" ]; then
         mv "$WORK/build" "$WORK/build.old"
     fi
     mv "$REPO/build" "$WORK/build"
-    rm -rf "$WORK/build.old"
     write_state built-from "$(cat "$SRC/.source-hash") $(read_state disks-imported) $(read_state cdroms-imported)"
     echo "==> Build ready"
 }
