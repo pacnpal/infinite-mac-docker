@@ -57,6 +57,11 @@ ENV PORT=3127 \
     WRANGLER_SEND_METRICS=false \
     CI=1
 EXPOSE 3127
+# Tells Traefik which port to route to. Routing itself is opt-in: set
+# traefik.enable=true and a Host rule on the container (see docker/README.md).
+# Don't add Traefik header middlewares that replace the Cross-Origin-* headers
+# the server sends; the emulator needs them.
+LABEL traefik.http.services.infinite-mac.loadbalancer.server.port="3127"
 # KV counters and Durable Object (virtual AppleTalk zone) state.
 VOLUME /data
 

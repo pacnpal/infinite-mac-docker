@@ -14,3 +14,20 @@ services:
       PGID: "100"
     volumes:
       - ./data:/data
+    # Traefik: replace mac.example.com, the entrypoint and the cert resolver
+    # with yours. Delete these labels (and the networks entries) if you don't
+    # use Traefik.
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.infinite-mac.rule: Host(`mac.example.com`)
+      traefik.http.routers.infinite-mac.entrypoints: websecure
+      traefik.http.routers.infinite-mac.tls: "true"
+      traefik.http.routers.infinite-mac.tls.certresolver: letsencrypt
+      traefik.http.services.infinite-mac.loadbalancer.server.port: "3127"
+    networks:
+      - proxy
+
+networks:
+  # The Docker network your Traefik container is on.
+  proxy:
+    external: true

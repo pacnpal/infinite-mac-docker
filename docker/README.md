@@ -38,6 +38,28 @@ The proxy must pass these response headers through unchanged:
 - `Cross-Origin-Opener-Policy: same-origin`
 - `Cross-Origin-Embedder-Policy: require-corp`
 
+### Traefik
+
+The image already tells Traefik to forward to port 3127. Routing is opt-in, so
+add these labels to the container (they're in `compose.yaml` and the Unraid
+template too):
+
+```
+traefik.enable=true
+traefik.http.routers.infinite-mac.rule=Host(`mac.example.com`)
+traefik.http.routers.infinite-mac.entrypoints=websecure
+traefik.http.routers.infinite-mac.tls=true
+traefik.http.routers.infinite-mac.tls.certresolver=letsencrypt
+```
+
+Use your own hostname, HTTPS entrypoint name and cert resolver. Drop the
+`certresolver` label if you use a wildcard or default certificate. The
+container has to be on the same Docker network as Traefik; if it's on several
+networks, add `traefik.docker.network=<that network>`.
+
+Traefik passes the server's `Cross-Origin-*` headers through by default. Don't
+attach a headers middleware that replaces them.
+
 ## Unraid
 
 1. Copy [`unraid/infinite-mac.xml`](unraid/infinite-mac.xml) to
@@ -53,7 +75,10 @@ The proxy must pass these response headers through unchanged:
    then **Apply**.
 
 The template maps `/data` to `/mnt/user/appdata/infinite-mac` and runs as
-`99:100` (nobody:users), like other Unraid containers.
+`99:100` (nobody:users), like other Unraid containers. It also has the Traefik
+labels: change the host rule to your domain, and set **Network Type** to the
+custom network your Traefik container uses. If you don't use Traefik, set
+`traefik.enable` to `false`.
 
 ## Settings
 
