@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>infinite-mac</Name>
+  <Repository>ghcr.io/pacnpal/infinite-mac-docker:latest</Repository>
+  <Registry>https://github.com/pacnpal/infinite-mac-docker/pkgs/container/infinite-mac-docker</Registry>
+  <Network>bridge</Network>
+  <MyIP/>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/pacnpal/infinite-mac-docker/issues</Support>
+  <Project>https://github.com/mihaip/infinite-mac</Project>
+  <Overview>Self-hosted Infinite Mac: classic Mac OS (System 1 through System 7.5.5) running in the browser via WebAssembly. Needs HTTPS (or localhost) for working keyboard and mouse input and the Saved HD disk, so put it behind your reverse proxy.</Overview>
+  <Category>Other: Tools:</Category>
+  <WebUI>http://[IP]:[PORT:3127]/</WebUI>
+  <TemplateURL>https://raw.githubusercontent.com/pacnpal/infinite-mac-docker/main/docker/unraid/infinite-mac.xml</TemplateURL>
+  <Icon>https://raw.githubusercontent.com/pacnpal/infinite-mac-docker/main/public/logo192.png</Icon>
+  <ExtraParams/>
+  <PostArgs/>
+  <CPUset/>
+  <Requires/>
+  <Config Name="Web port" Target="3127" Default="3127" Mode="tcp" Description="HTTP port. Put HTTPS in front of it." Type="Port" Display="always" Required="true" Mask="false">3127</Config>
+  <Config Name="Appdata" Target="/data" Default="/mnt/user/appdata/infinite-mac" Mode="rw" Description="Server-side state (counters, virtual AppleTalk zones)." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/infinite-mac</Config>
+  <Config Name="PUID" Target="PUID" Default="99" Mode="" Description="User ID to run as." Type="Variable" Display="advanced" Required="false" Mask="false">99</Config>
+  <Config Name="PGID" Target="PGID" Default="100" Mode="" Description="Group ID to run as." Type="Variable" Display="advanced" Required="false" Mask="false">100</Config>
+</Container>
