@@ -4,16 +4,21 @@
 # container was started with --user, that user is used as-is.
 set -e
 
+mkdir -p "$HOME"
+
+run_as=""
 if [ "$(id -u)" = "0" ]; then
     PUID="${PUID:-99}"
     PGID="${PGID:-100}"
-    mkdir -p /data
-    chown "$PUID:$PGID" /data
-    exec setpriv --reuid="$PUID" --regid="$PGID" --clear-groups "$0" "$@"
+    # Fix anything left over from an earlier PUID/PGID (or created as root),
+    # touching only entries that don't already match.
+    find /data \( ! -user "$PUID" -o ! -group "$PGID" \) \
+        -exec chown "$PUID:$PGID" {} +
+    run_as="setpriv --reuid=$PUID --regid=$PGID --clear-groups"
 fi
 
-mkdir -p "$HOME"
-exec wrangler dev \
+# shellcheck disable=SC2086 # run_as is intentionally word-split.
+exec $run_as wrangler dev \
     --config /app/build/infinite_mac/wrangler.json \
     --ip 0.0.0.0 \
     --port "$PORT" \

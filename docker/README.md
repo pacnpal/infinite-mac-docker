@@ -63,6 +63,10 @@ The template maps `/data` to `/mnt/user/appdata/infinite-mac` and runs as
 | `PUID` | `99` | User ID to run as (ignored if you start the container with `--user`) |
 | `PGID` | `100` | Group ID to run as |
 
+On start, anything in `/data` not owned by `PUID:PGID` is chowned to it, so
+changing these later is safe. If you use `--user` instead, the container can't
+do that, so `/data` must already be writable by that user.
+
 `/data` holds wrangler's local state: visit counters and the Durable Object
 behind virtual AppleTalk zones. Your files on the emulated Saved HD disk live
 in your browser, not on the server.
