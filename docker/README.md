@@ -139,7 +139,9 @@ GB of RAM while it runs. How long it takes depends mostly on your connection
 and archive.org's speed; expect hours for the CD-ROMs.
 
 If the container stops mid-import, the next start picks up from the download
-cache. Your files on the emulated Saved HD disk live in your browser, not on
+cache. CD-ROMs that can't be downloaded or extracted are skipped; `/_import`
+shows how many, and `/data/work/cdroms.log` says which. To retry them, delete
+`/data/work/cdroms-imported` and restart. Your files on the emulated Saved HD disk live in your browser, not on
 the server.
 
 ### Updates
@@ -171,14 +173,19 @@ docker build -f docker/Dockerfile -t infinite-mac .
   CD-ROM media straight from `/data` (and the image), and proxies everything
   else, WebSockets included, to wrangler on an internal port.
 - `docker/import.sh` does the downloading, importing and app build, and skips
-  steps whose inputs haven't changed.
+  steps whose inputs haven't changed. Re-imports keep the existing chunks and
+  media, so the running build keeps working; `docker/gc.py` removes ones
+  nothing references afterwards. Archive extraction uses Debian's `unar` in
+  place of upstream's macOS build of XADMaster.
 - `docker/entrypoint.sh` fixes `/data` ownership and drops to `PUID:PGID`.
 
 Changes outside `docker/`:
 
 - `scripts/import-disks.py`: a `systems` mode that imports every system disk
-  without the macOS-only software library build, and accepts comma-separated
-  filters.
+  without the macOS-only software library build, keeps existing chunks, and
+  accepts comma-separated filters.
+- `scripts/import-cd-roms.py`: `--keep-media`, to keep existing media instead
+  of clearing it first.
 - `worker/cd-rom.ts`: without an R2 bucket, self-hosted media is read from
   `LOCAL_MEDIA_ORIGIN` (the front server) instead of failing.
 
