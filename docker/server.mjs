@@ -122,11 +122,19 @@ function serveFile(req, res, filePath, headers) {
         res.writeHead(405).end();
         return;
     }
-    if (!filePath) {
+    // Open first, so a file removed by a concurrent cleanup is a 404 rather
+    // than an error after the headers are sent.
+    let fd;
+    try {
+        fd = filePath ? fs.openSync(filePath, "r") : null;
+    } catch {
+        fd = null;
+    }
+    if (fd === null) {
         res.writeHead(404, {"Content-Type": "text/plain"}).end("Not found");
         return;
     }
-    const {size} = fs.statSync(filePath);
+    const {size} = fs.fstatSync(fd);
     let start = 0;
     let end = size - 1;
     let status = 200;
@@ -139,6 +147,7 @@ function serveFile(req, res, filePath, headers) {
             start = Math.max(size - parseInt(range[2], 10), 0);
         }
         if (start > end || start >= size) {
+            fs.closeSync(fd);
             res.writeHead(416, {"Content-Range": `bytes */${size}`}).end();
             return;
         }
@@ -151,10 +160,16 @@ function serveFile(req, res, filePath, headers) {
         "Content-Length": String(end - start + 1),
     });
     if (req.method === "HEAD") {
+        fs.closeSync(fd);
         res.end();
         return;
     }
-    fs.createReadStream(filePath, {start, end}).pipe(res);
+    const stream = fs.createReadStream(null, {fd, start, end});
+    stream.on("error", err => {
+        log(`error reading ${filePath}: ${err.message}`);
+        res.destroy(err);
+    });
+    stream.pipe(res);
 }
 
 function proxyRequest(req, res) {
@@ -272,21 +287,18 @@ function startWrangler(buildDir) {
         {stdio: ["ignore", "pipe", "pipe"], cwd: path.dirname(config)}
     );
     wrangler = child;
-    const onOutput = data => {
-        const text = data.toString();
-        if (!wranglerReady && text.includes("Ready on")) {
+    const onLine = line => {
+        if (!wranglerReady && line.includes("Ready on")) {
             wranglerReady = true;
             log(`wrangler ready (${buildName(buildDir)} build)`);
         }
         // The module table wrangler prints at startup is noise.
-        for (const line of text.split("\n")) {
-            if (line.trim() && !/^[│├┌└]/.test(line)) {
-                process.stdout.write(`[wrangler] ${line}\n`);
-            }
+        if (!/^[│├┌└]/.test(line)) {
+            process.stdout.write(`[wrangler] ${line}\n`);
         }
     };
-    child.stdout.on("data", onOutput);
-    child.stderr.on("data", onOutput);
+    readLines(child.stdout, onLine);
+    readLines(child.stderr, onLine);
     child.on("exit", (code, signal) => {
         if (wrangler !== child) {
             return; // Replaced on purpose.
@@ -309,7 +321,7 @@ function stopWrangler() {
     const child = wrangler;
     wrangler = null;
     wranglerReady = false;
-    if (!child || child.exitCode !== null) {
+    if (!child || child.exitCode !== null || child.signalCode !== null) {
         return Promise.resolve();
     }
     return new Promise(resolve => {
@@ -330,27 +342,22 @@ function runImport() {
             stdio: ["ignore", "pipe", "pipe"],
         }
     );
-    const onOutput = data => {
-        for (const line of data.toString().split(/[\r\n]+/)) {
-            if (!line.trim()) {
-                continue;
-            }
-            const phase = /^==> (.*)$/.exec(line);
-            if (phase && phase[1] === "Build ready") {
-                switchToFullBuild();
-            } else if (phase?.[1].startsWith("CD-ROMs imported")) {
-                setImportState({cdroms: phase[1]});
-            } else if (phase) {
-                setImportState({detail: phase[1]});
-            }
-            // Per-chunk progress lines would flood the container log.
-            if (!/^Chunking .*%$/.test(line)) {
-                process.stdout.write(`[import] ${line}\n`);
-            }
+    const onLine = line => {
+        const phase = /^==> (.*)$/.exec(line);
+        if (phase && phase[1] === "Build ready") {
+            switchToFullBuild();
+        } else if (phase?.[1].startsWith("CD-ROMs imported")) {
+            setImportState({cdroms: phase[1]});
+        } else if (phase) {
+            setImportState({detail: phase[1]});
+        }
+        // Per-chunk progress lines would flood the container log.
+        if (!/^Chunking .*%$/.test(line)) {
+            process.stdout.write(`[import] ${line}\n`);
         }
     };
-    importProcess.stdout.on("data", onOutput);
-    importProcess.stderr.on("data", onOutput);
+    readLines(importProcess.stdout, onLine);
+    readLines(importProcess.stderr, onLine);
     importProcess.on("exit", code => {
         importProcess = null;
         if (code !== 0) {
@@ -416,6 +423,26 @@ function readBuiltFrom() {
 }
 
 // --- helpers ----------------------------------------------------------------
+
+// Calls onLine for each complete, non-empty line, so markers split across
+// chunks of output are still seen whole.
+function readLines(stream, onLine) {
+    let pending = "";
+    stream.on("data", data => {
+        const lines = (pending + data.toString()).split(/[\r\n]/);
+        pending = lines.pop() ?? "";
+        for (const line of lines) {
+            if (line.trim()) {
+                onLine(line);
+            }
+        }
+    });
+    stream.on("end", () => {
+        if (pending.trim()) {
+            onLine(pending);
+        }
+    });
+}
 
 function hasBuild(buildDir) {
     return fs.existsSync(path.join(buildDir, "infinite_mac", "wrangler.json"));

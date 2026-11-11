@@ -108,7 +108,7 @@ do that, so `/data` must already be writable by that user.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `INFINITE_MAC_SYSTEMS` | `all` | `all`, `classic` (System 1 to 7.5.5 only, nothing downloaded), or comma-separated name filters such as `Mac OS 8,Mac OS 9`. System 1 to 7.5.5 are always included. |
+| `INFINITE_MAC_SYSTEMS` | `all` | `all`, `classic` (System 1 to 7.5.5 only, no system disk downloads), or comma-separated name filters such as `Mac OS 8,Mac OS 9`. System 1 to 7.5.5 are always included. This doesn't affect CD-ROMs: set `INFINITE_MAC_CDROMS=none` too if you want nothing downloaded. |
 | `INFINITE_MAC_CDROMS` | `all` | `all`, or `none` to skip the CD-ROM and floppy catalog |
 | `INFINITE_MAC_KEEP_DOWNLOADS` | `true` | Keep the download cache, so a re-import after an image update doesn't download again. `false` deletes it after each import. |
 | `INFINITE_MAC_IMPORT` | | `none` turns the import off entirely |
@@ -140,8 +140,9 @@ and archive.org's speed; expect hours for the CD-ROMs.
 
 If the container stops mid-import, the next start picks up from the download
 cache. CD-ROMs that can't be downloaded or extracted are skipped; `/_import`
-shows how many, and `/data/work/cdroms.log` says which. To retry them, delete
-`/data/work/cdroms-imported` and restart. Your files on the emulated Saved HD disk live in your browser, not on
+shows how many, and `/data/work/cdroms.log` says which. Skipped ones are
+retried on the next start, up to three runs in total. After that, delete
+`/data/work/cdroms-imported` and restart to try again. Your files on the emulated Saved HD disk live in your browser, not on
 the server.
 
 ### Updates

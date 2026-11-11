@@ -463,7 +463,11 @@ if __name__ == "__main__":
                             i.value, dest_dir=temp_dir, compressed=True
                         )
                     )
-                elif systems_mode and i == InfiniteHD.BEOS and not system_filter:
+                elif systems_mode and i == InfiniteHD.BEOS and any(
+                    keep_system_disk(d.name, system_filter, systems_mode)
+                    for d in disks.ALL_DISKS
+                    if "BeOS" in d.name
+                ):
                     images.append(
                         write_image_def(
                             disks.INFINITE_HD_BEOS.read(), i.value, dest_dir=temp_dir

@@ -7,7 +7,7 @@
 #
 # Settings (environment):
 #   INFINITE_MAC_SYSTEMS         all (default), classic (System 1 to 7.5.5
-#                                only, no downloads), or comma-separated name
+#                                only, no system downloads), or comma-separated name
 #                                filters such as "Mac OS 8,Mac OS 9" (System 1
 #                                to 7.5.5 always stay)
 #   INFINITE_MAC_CDROMS          all (default) or none
@@ -30,7 +30,9 @@ build_key="$(cat "$SRC/.source-hash") $disks_key $cdroms_key"
 
 main() {
     mkdir -p "$WORK"
-    if [ "$(read_state built-from)" = "$build_key" ]; then
+    if [ "$(read_state built-from)" = "$build_key" ] &&
+        [ "$(read_state disks-imported)" = "$disks_key" ] &&
+        [ "$(read_state cdroms-imported)" = "$cdroms_key" ]; then
         delete_downloads_if_asked
         echo "==> Up to date"
         exit 0
@@ -51,7 +53,6 @@ main() {
 
     if [ "$(read_state cdroms-imported)" != "$cdroms_key" ]; then
         import_cdroms
-        write_state cdroms-imported "$cdroms_key"
         build_app
     fi
 
@@ -123,6 +124,7 @@ import_cdroms() {
     if [ "$CDROMS" = none ]; then
         echo "==> Skipping CD-ROMs"
         uv run scripts/import-cd-roms.py placeholder
+        write_state cdroms-imported "$cdroms_key"
     else
         echo "==> Importing CD-ROMs (about 35 GB of downloads for the self-hosted ones)"
         # The importer skips entries it can't fetch or extract and carries on;
@@ -134,7 +136,27 @@ import_cdroms() {
         } | tee "$WORK/cdroms.log"
         [ "$(cat "$WORK/cdroms.rc")" = 0 ] || return 1
         skipped="$(grep -c "ERROR, will be skipped" "$WORK/cdroms.log" || true)"
-        echo "==> CD-ROMs imported, $skipped skipped (see cdroms.log in /data/work)"
+        # Skipped entries are retried on the next start (cheap: everything
+        # else comes from the download cache), up to 3 runs per set of inputs,
+        # so a permanently broken entry doesn't cost a re-scan every restart.
+        attempts_file="$WORK/cdroms-attempts"
+        attempts=0
+        if [ "$(sed -n 1p "$attempts_file" 2>/dev/null)" = "$cdroms_key" ]; then
+            attempts="$(sed -n 2p "$attempts_file")"
+        fi
+        attempts=$((attempts + 1))
+        printf '%s\n%s\n' "$cdroms_key" "$attempts" > "$attempts_file"
+        if [ "$skipped" = 0 ] || [ "$attempts" -ge 3 ]; then
+            write_state cdroms-imported "$cdroms_key"
+            rm -f "$attempts_file"
+        fi
+        if [ "$skipped" = 0 ]; then
+            echo "==> CD-ROMs imported"
+        elif [ "$attempts" -ge 3 ]; then
+            echo "==> CD-ROMs imported, $skipped skipped after 3 tries (see cdroms.log in /data/work)"
+        else
+            echo "==> CD-ROMs imported, $skipped skipped, retrying on next start (see cdroms.log in /data/work)"
+        fi
     fi
 }
 
