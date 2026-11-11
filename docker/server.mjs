@@ -16,6 +16,7 @@ import fs from "node:fs";
 import http from "node:http";
 import net from "node:net";
 import path from "node:path";
+import {pipeline} from "node:stream";
 
 const PORT = parseInt(process.env.PORT ?? "3127", 10);
 const WRANGLER_PORT = parseInt(process.env.WRANGLER_PORT ?? "3128", 10);
@@ -164,12 +165,12 @@ function serveFile(req, res, filePath, headers) {
         res.end();
         return;
     }
-    const stream = fs.createReadStream(null, {fd, start, end});
-    stream.on("error", err => {
-        log(`error reading ${filePath}: ${err.message}`);
-        res.destroy(err);
+    // pipeline() closes the file if the client goes away mid-transfer.
+    pipeline(fs.createReadStream(null, {fd, start, end}), res, err => {
+        if (err && err.code !== "ERR_STREAM_PREMATURE_CLOSE") {
+            log(`error sending ${filePath}: ${err.message}`);
+        }
     });
-    stream.pipe(res);
 }
 
 function proxyRequest(req, res) {

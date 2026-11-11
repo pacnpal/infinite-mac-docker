@@ -42,21 +42,25 @@ main() {
     cd "$REPO"
 
     # The app build needs CD-ROM and library catalogs to exist.
-    [ -f src/Data/CD-ROMs.json ] || uv run scripts/import-cd-roms.py placeholder
+    [ -f src/Data/CD-ROMs.json ] || uv run scripts/import-cd-roms.py placeholder --keep-media
     [ -f src/Data/Library-index.json ] || uv run scripts/import-library.py placeholder
 
+    built=false
     if [ "$(read_state disks-imported)" != "$disks_key" ]; then
         import_disks
         write_state disks-imported "$disks_key"
         build_app
+        built=true
     fi
 
     if [ "$(read_state cdroms-imported)" != "$cdroms_key" ]; then
         import_cdroms
         build_app
+        built=true
     fi
 
-    if [ "$(read_state built-from)" != "$build_key" ]; then
+    # Source-only changes (an image update that touched neither import).
+    if [ "$built" = false ] && [ "$(read_state built-from)" != "$build_key" ]; then
         build_app
     fi
 
@@ -123,7 +127,8 @@ import_cdroms() {
     rm -f "$WORK/cdroms-imported"
     if [ "$CDROMS" = none ]; then
         echo "==> Skipping CD-ROMs"
-        uv run scripts/import-cd-roms.py placeholder
+        # --keep-media: the running build may still use them; gc.py cleans up.
+        uv run scripts/import-cd-roms.py placeholder --keep-media
         write_state cdroms-imported "$cdroms_key"
     else
         echo "==> Importing CD-ROMs (about 35 GB of downloads for the self-hosted ones)"
