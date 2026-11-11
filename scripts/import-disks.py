@@ -388,11 +388,29 @@ STICKIES = [
     ),
 ]
 
+
+def keep_system_disk(
+    name: str, system_filter: typing.Optional[str], systems_mode: bool
+) -> bool:
+    if not system_filter:
+        return True
+    if systems_mode:
+        # Comma-separated filters, and the classic images are always kept.
+        filters = [f.strip() for f in system_filter.split(",") if f.strip()]
+        return "System" in name or any(f in name for f in filters)
+    return system_filter in name
+
+
 if __name__ == "__main__":
     system_filter = os.getenv("DEBUG_SYSTEM_FILTER")
     library_filter = os.getenv("DEBUG_LIBRARY_FILTER")
 
-    minimal_mode = len(sys.argv) >= 2 and sys.argv[1] == "minimal"
+    mode = sys.argv[1] if len(sys.argv) >= 2 else None
+    minimal_mode = mode == "minimal"
+    # All system images, without building the software library (that needs
+    # macOS-only tools); Infinite HD is the prebuilt base image. Used by the
+    # self-hosted Docker image (see docker/).
+    systems_mode = mode == "systems"
     if minimal_mode:
         system_filter = "System"  # Just classic images
 
@@ -405,12 +423,12 @@ if __name__ == "__main__":
         images = []
         if not library_filter:
             for disk in disks.ALL_DISKS:
-                if system_filter and system_filter not in disk.name:
-                    if minimal_mode:
+                if not keep_system_disk(disk.name, system_filter, systems_mode):
+                    if minimal_mode or systems_mode:
                         images.append(write_image_def(bytes(), disk.name, temp_dir))
                     continue
                 images.append(build_system_image(disk, temp_dir))
-        if not system_filter:
+        if not system_filter and not systems_mode:
             infinite_hd6_image, infinite_hd_image, infinite_hdX_image = (
                 build_library_images(temp_dir)
             )
@@ -433,10 +451,22 @@ if __name__ == "__main__":
                     dest_dir=temp_dir,
                 )
             )
-        elif minimal_mode:
+        elif minimal_mode or systems_mode:
             for i in InfiniteHD:
                 if i == InfiniteHD.DEFAULT:
                     images.append(build_passthrough_image(i.value, dest_dir=temp_dir))
+                elif systems_mode and i == InfiniteHD.NEXT:
+                    images.append(
+                        build_passthrough_image(
+                            i.value, dest_dir=temp_dir, compressed=True
+                        )
+                    )
+                elif systems_mode and i == InfiniteHD.BEOS and not system_filter:
+                    images.append(
+                        write_image_def(
+                            disks.INFINITE_HD_BEOS.read(), i.value, dest_dir=temp_dir
+                        )
+                    )
                 else:
                     images.append(write_image_def(bytes(), i.value, temp_dir))
 

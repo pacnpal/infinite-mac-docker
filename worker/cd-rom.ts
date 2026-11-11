@@ -7,7 +7,11 @@ type CDROMSpec = {
     totalSize?: number;
 };
 
-export async function handleRequest(request: Request, bucket: R2Bucket) {
+export async function handleRequest(
+    request: Request,
+    bucket: R2Bucket | undefined,
+    localMediaOrigin?: string
+) {
     const url = new URL(request.url);
     const path = url.pathname;
     const pathPieces = path.split("/");
@@ -39,7 +43,7 @@ export async function handleRequest(request: Request, bucket: R2Bucket) {
     }
 
     if (request.method === "GET") {
-        return await handleGET(pathPieces, spec, bucket, url);
+        return await handleGET(pathPieces, spec, bucket, url, localMediaOrigin);
     }
 
     return errorResponse("Method not allowed", 405);
@@ -74,8 +78,9 @@ export function isValidSrcUrl(srcUrl: string) {
 async function handleGET(
     pathPieces: string[],
     spec: CDROMSpec,
-    bucket: R2Bucket,
-    requestUrl: URL
+    bucket: R2Bucket | undefined,
+    requestUrl: URL,
+    localMediaOrigin?: string
 ) {
     const chunkMatch = /(\d+)-(\d+).chunk$/.exec(pathPieces[3]);
     if (!chunkMatch) {
@@ -85,7 +90,12 @@ async function handleGET(
     const chunkStart = parseInt(chunkMatch[1]);
     const chunkEnd = parseInt(chunkMatch[2]);
 
-    const fetchChunk = createChunkFetcher(spec, bucket, requestUrl);
+    const fetchChunk = createChunkFetcher(
+        spec,
+        bucket,
+        requestUrl,
+        localMediaOrigin
+    );
     try {
         const {chunk, contentLength} = await fetchChunk(chunkStart, chunkEnd);
         return new Response(chunk, {
@@ -244,8 +254,9 @@ type ChunkFetcher = (
 
 function createChunkFetcher(
     spec: CDROMSpec,
-    bucket: R2Bucket,
-    requestUrl: URL
+    bucket: R2Bucket | undefined,
+    requestUrl: URL,
+    localMediaOrigin?: string
 ): ChunkFetcher {
     if (!isR2MediaSrcUrl(spec.srcUrl)) {
         return withFetchRetries((start, end) =>
@@ -256,9 +267,14 @@ function createChunkFetcher(
         // getR2Object owns the selective retry policy for bucket reads.
         return (start, end) => fetchR2MediaChunk(spec, start, end, bucket);
     }
-    if (import.meta.env.DEV) {
+    // Self-hosted builds (see docker/) have no bucket either; they serve media
+    // from a local origin instead.
+    if (import.meta.env.DEV || localMediaOrigin) {
+        const mediaBaseUrl = localMediaOrigin
+            ? new URL(localMediaOrigin)
+            : requestUrl;
         return withFetchRetries((start, end) =>
-            fetchLocalMediaChunk(spec, start, end, requestUrl)
+            fetchLocalMediaChunk(spec, start, end, mediaBaseUrl)
         );
     }
     return async () => {

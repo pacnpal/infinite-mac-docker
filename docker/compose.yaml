@@ -12,6 +12,10 @@ services:
     environment:
       PUID: "99"
       PGID: "100"
+      # What to download into /data on first start (see README.md).
+      INFINITE_MAC_SYSTEMS: all
+      INFINITE_MAC_CDROMS: all
+      INFINITE_MAC_KEEP_DOWNLOADS: "true"
     volumes:
       - ./data:/data
     # Traefik: replace mac.example.com, the entrypoint and the cert resolver
