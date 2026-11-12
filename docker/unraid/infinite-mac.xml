@@ -9,7 +9,7 @@
   <Privileged>false</Privileged>
   <Support>https://github.com/pacnpal/infinite-mac-docker/issues</Support>
   <Project>https://github.com/mihaip/infinite-mac</Project>
-  <Overview>Self-hosted Infinite Mac: classic Mac OS (System 1 through System 7.5.5) running in the browser via WebAssembly. Needs HTTPS (or localhost) for working keyboard and mouse input and the Saved HD disk, so put it behind your reverse proxy. Traefik labels are included: set your hostname in the host rule, and put the container on the same Docker network as Traefik.</Overview>
+  <Overview>Self-hosted Infinite Mac: classic Mac OS, Mac OS X, NeXT, BeOS and A/UX running in the browser via WebAssembly. System 1 to 7.5.5 work right away; on first start it downloads every other system disk and the CD-ROM catalog into appdata (tens of GB, see the README) and switches over when done. Progress is at /_import. Needs HTTPS (or localhost) for working keyboard and mouse input and the Saved HD disk, so put it behind your reverse proxy. Traefik labels are included: set your hostname in the host rule, and put the container on the same Docker network as Traefik.</Overview>
   <Category>Other: Tools:</Category>
   <WebUI>http://[IP]:[PORT:3127]/</WebUI>
   <TemplateURL>https://raw.githubusercontent.com/pacnpal/infinite-mac-docker/main/docker/unraid/infinite-mac.xml</TemplateURL>
@@ -19,13 +19,16 @@
   <CPUset/>
   <Requires/>
   <Config Name="Web port" Target="3127" Default="3127" Mode="tcp" Description="HTTP port. Put HTTPS in front of it." Type="Port" Display="always" Required="true" Mask="false">3127</Config>
-  <Config Name="Appdata" Target="/data" Default="/mnt/user/appdata/infinite-mac" Mode="rw" Description="Server-side state (counters, virtual AppleTalk zones)." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/infinite-mac</Config>
+  <Config Name="Appdata" Target="/data" Default="/mnt/user/appdata/infinite-mac" Mode="rw" Description="Downloaded and imported disks, CD-ROMs, the download cache and server state. Can grow to around 100 GB with everything." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/infinite-mac</Config>
   <Config Name="Traefik: enable" Target="traefik.enable" Default="true" Mode="" Description="Route this container through Traefik. Set to false if you don't use Traefik." Type="Label" Display="always" Required="false" Mask="false">true</Config>
   <Config Name="Traefik: host rule" Target="traefik.http.routers.infinite-mac.rule" Default="Host(`mac.example.com`)" Mode="" Description="Hostname to serve on. Replace mac.example.com with your domain." Type="Label" Display="always" Required="false" Mask="false">Host(`mac.example.com`)</Config>
   <Config Name="Traefik: entrypoint" Target="traefik.http.routers.infinite-mac.entrypoints" Default="websecure" Mode="" Description="Your Traefik HTTPS entrypoint name. It must be HTTPS: the emulator needs a secure origin." Type="Label" Display="always" Required="false" Mask="false">websecure</Config>
   <Config Name="Traefik: TLS" Target="traefik.http.routers.infinite-mac.tls" Default="true" Mode="" Description="Serve this router over TLS." Type="Label" Display="advanced" Required="false" Mask="false">true</Config>
   <Config Name="Traefik: cert resolver" Target="traefik.http.routers.infinite-mac.tls.certresolver" Default="letsencrypt" Mode="" Description="Name of your Traefik certificate resolver. Remove this label if you use a wildcard or default certificate." Type="Label" Display="advanced" Required="false" Mask="false">letsencrypt</Config>
   <Config Name="Traefik: service port" Target="traefik.http.services.infinite-mac.loadbalancer.server.port" Default="3127" Mode="" Description="Container port Traefik forwards to. Match the Web port's container side." Type="Label" Display="advanced" Required="false" Mask="false">3127</Config>
+  <Config Name="Systems to download" Target="INFINITE_MAC_SYSTEMS" Default="all" Mode="" Description="all, classic (System 1 to 7.5.5 only, no system disk downloads), or comma-separated name filters such as Mac OS 8,Mac OS 9. System 1 to 7.5.5 are always included. CD-ROMs are set separately below." Type="Variable" Display="always" Required="false" Mask="false">all</Config>
+  <Config Name="CD-ROMs" Target="INFINITE_MAC_CDROMS" Default="all" Mode="" Description="all, or none to skip the CD-ROM and floppy catalog (about 34 GB of downloads)." Type="Variable" Display="always" Required="false" Mask="false">all</Config>
+  <Config Name="Keep downloads" Target="INFINITE_MAC_KEEP_DOWNLOADS" Default="true" Mode="" Description="true keeps the download cache so re-imports after updates don't download again. false deletes it after each import to save space." Type="Variable" Display="advanced" Required="false" Mask="false">true</Config>
   <Config Name="PUID" Target="PUID" Default="99" Mode="" Description="User ID to run as." Type="Variable" Display="advanced" Required="false" Mask="false">99</Config>
   <Config Name="PGID" Target="PGID" Default="100" Mode="" Description="Group ID to run as." Type="Variable" Display="advanced" Required="false" Mask="false">100</Config>
 </Container>

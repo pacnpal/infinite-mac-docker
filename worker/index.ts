@@ -13,6 +13,8 @@ export type Env = {
     VARZ: KVNamespace;
     VARZ_ANALYTICS: AnalyticsEngineDataset;
     DISK_BUCKET: R2Bucket;
+    // Set by self-hosted builds (see docker/) that serve media without R2.
+    LOCAL_MEDIA_ORIGIN?: string;
     ASSETS: Assets;
 };
 const handler: ExportedHandler<Env> = {fetch: handleRequest};
@@ -42,13 +44,17 @@ async function handleRequest(
         return varz.handleErrorzRequest(request, env.VARZ, env.VARZ_ANALYTICS);
     }
     if (path[0] === "CD-ROM") {
-        return cdrom.handleRequest(request, env.DISK_BUCKET);
+        return cdrom.handleRequest(
+            request,
+            env.DISK_BUCKET,
+            env.LOCAL_MEDIA_ORIGIN
+        );
     }
     if (path[0] === "Library") {
         return library.handleRequest(request, env.ASSETS);
     }
     if (path[0] === "Disk") {
-        return disk.handleRequest(request, env.DISK_BUCKET, ctx, env.ASSETS);
+        return disk.handleRequest(request, env.DISK_BUCKET, ctx);
     }
 
     const legacyDomainRedirect = getLegacyDomainRedirect(url);

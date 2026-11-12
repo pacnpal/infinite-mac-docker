@@ -1,11 +1,9 @@
-import {type Assets} from "./index";
 import {getR2Object} from "./r2";
 
 export async function handleRequest(
     request: Request,
-    bucket: R2Bucket | undefined,
-    ctx: ExecutionContext,
-    assets: Assets
+    bucket: R2Bucket,
+    ctx: ExecutionContext
 ) {
     const url = new URL(request.url);
     const path = url.pathname.slice(1).split("/");
@@ -15,21 +13,11 @@ export async function handleRequest(
         // Locally we don't have a R2 bucket configured, serve files directly
         // from the build directory (where import-disks.py puts them and
         // sync-disks.sh uploads them to R2 from).
-        const chunkUrl = new URL(`/Images/build/${key}`, url);
         if (import.meta.env.DEV) {
+            const chunkUrl = new URL(`/Images/build/${key}`, url);
             return Response.redirect(chunkUrl.toString(), 302);
         }
-        // Self-hosted builds (see docker/) bundle the chunks with the static
-        // assets instead of using R2. The SPA fallback answers missing files
-        // with index.html, so treat HTML as not found.
-        const response = await assets.fetch(new Request(chunkUrl));
-        if (
-            !response.ok ||
-            response.headers.get("Content-Type")?.startsWith("text/html")
-        ) {
-            return errorResponse("Chunk not found", 404);
-        }
-        return response;
+        return errorResponse("Bucket not configured", 500);
     }
     if (request.method !== "GET") {
         return errorResponse("Method not allowed", 405);

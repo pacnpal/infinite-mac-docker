@@ -486,6 +486,14 @@ def main():
         ),
     )
     parser.add_argument(
+        "--keep-media",
+        action="store_true",
+        help=(
+            "keep previously written self-hosted media instead of clearing the "
+            "build directory (it may be in use by a running server)"
+        ),
+    )
+    parser.add_argument(
         "--sync-media",
         action="store_true",
         help="upload self-hosted media to Cloudflare R2 if missing",
@@ -517,8 +525,9 @@ def main():
     placeholder_mode = args.placeholder == "placeholder"
     shutil.rmtree(paths.COVERS_DIR, ignore_errors=True)
     os.mkdir(paths.COVERS_DIR)
-    shutil.rmtree(paths.CD_ROMS_BUILD_DIR, ignore_errors=True)
-    os.mkdir(paths.CD_ROMS_BUILD_DIR)
+    if not args.keep_media:
+        shutil.rmtree(paths.CD_ROMS_BUILD_DIR, ignore_errors=True)
+    os.makedirs(paths.CD_ROMS_BUILD_DIR, exist_ok=True)
 
     output_manifests = {}
     if not placeholder_mode:
