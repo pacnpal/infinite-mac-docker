@@ -77,6 +77,7 @@ ENV PORT=3127 \
     PUID=99 \
     PGID=100 \
     HOME=/data/home \
+    TMPDIR=/data/tmp \
     WRANGLER_SEND_METRICS=false \
     CI=1
 EXPOSE 3127
