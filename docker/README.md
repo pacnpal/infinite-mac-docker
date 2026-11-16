@@ -135,7 +135,10 @@ much. The tradeoff is downloading again when an image update needs a
 re-import.
 
 The import reads whole disk images into memory, so give the container several
-GB of RAM while it runs. How long it takes depends mostly on your connection
+GB of RAM while it runs. It also writes every disk image, uncompressed, to
+`/data/tmp` until the systems stage finishes, so `/data` needs that much free
+space on top of the numbers above (about 3.3 GB for System 1 to 7.5.5 plus
+Mac OS 9.0; much more with `all`). `/data/tmp` is emptied on every start. How long it takes depends mostly on your connection
 and archive.org's speed; expect hours for the CD-ROMs.
 
 If the container stops mid-import, the next start picks up from the download

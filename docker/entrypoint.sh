@@ -5,7 +5,12 @@
 set -e
 umask 022
 
-mkdir -p "$HOME"
+# Scratch files (the importer writes whole uncompressed disk images there)
+# must not land in the container's own filesystem, which on Unraid is the
+# size-limited docker.img. Nothing is running yet, so leftovers from an
+# interrupted run can go.
+rm -rf "$TMPDIR" 2>/dev/null || true
+mkdir -p "$HOME" "$TMPDIR"
 
 run_as=""
 if [ "$(id -u)" = "0" ]; then
